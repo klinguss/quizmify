@@ -1,17 +1,18 @@
 'use client';
-import { formatTimeDelta } from '@/lib/utils';
+import { cn, formatTimeDelta } from '@/lib/utils';
 import { Game, Question } from '@prisma/client';
 import { differenceInSeconds } from 'date-fns';
-import { ChevronRight, Loader2, Timer } from 'lucide-react';
+import { BarChart, ChevronRight, Loader2, Timer } from 'lucide-react';
 import React from 'react';
 import { Card, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
+import { Button, buttonVariants } from './ui/button';
 import { useToast } from './ui/use-toast';
 import { useMutation } from '@tanstack/react-query';
 import { z } from 'zod';
 import { checkAnswerSchema } from '@/schemas/quiz';
 import axios from 'axios';
 import BlankAnswerInput from './BlankAnswerInput';
+import Link from 'next/link';
 type Props = {
   game: Game & { questions: Pick<Question, 'id' | 'question' | 'answer'>[] };
 };
@@ -38,9 +39,14 @@ const OpenEnded = ({ game }: Props) => {
 
   const { mutate: checkAnswer, isLoading: isChecking } = useMutation({
     mutationFn: async () => {
+      let filledAnswer = blankAnwer;
+      document.querySelectorAll('#user-blank-input').forEach((input) => {
+        filledAnswer = filledAnswer.replace('_____', input.value);
+        input.value = '';
+      });
       const payload: z.infer<typeof checkAnswerSchema> = {
         questionId: currentQuestion.id,
-        userAnswer: '',
+        userAnswer: filledAnswer,
       };
       const response = await axios.post('/api/checkAnswer', payload);
       return response.data;
@@ -63,14 +69,7 @@ const OpenEnded = ({ game }: Props) => {
         setQuestionIndex((prev) => prev + 1);
       },
     });
-  }, [
-    checkAnswer,
-    toast,
-    isChecking,
-    questionIndex,
-    game.questions.length,
-    blankAnwer,
-  ]);
+  }, [checkAnswer, toast, isChecking, questionIndex, game.questions.length]);
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -83,6 +82,24 @@ const OpenEnded = ({ game }: Props) => {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleNext]);
+
+  if (hasEnded) {
+    return (
+      <div className="absolute flex flex-col justify-center top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className="px-4 mt-2 font-semibold text-white bg-green-500 rounded-md whitespace-nowrap">
+          You completed in {''}
+          {formatTimeDelta(differenceInSeconds(now, game.timeStarted))}
+        </div>
+        <Link
+          href={`/statistics/${game.id}`}
+          className={cn(buttonVariants(), 'mt-2')}
+        >
+          View Stast
+          <BarChart className="w-4 h-4 ml-2" />
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 md:w-[80vw] max-w-4xl w-[9vw]">
